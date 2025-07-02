@@ -1,4 +1,4 @@
-name: Build APK
+name: Build and Sign APK
 
 on:
   workflow_dispatch:
@@ -17,14 +17,26 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > readmanga.keystore
+
       - name: Make gradlew executable
         run: chmod +x gradlew
 
-      - name: Build Release APK
-        run: ./gradlew assembleRelease --stacktrace --info
+      - name: Build signed APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          ./gradlew assembleRelease \
+          -Pandroid.injected.signing.store.file=$(pwd)/readmanga.keystore \
+          -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
+          -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
+          -Pandroid.injected.signing.key.password=$KEY_PASSWORD
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ReadManga-release-apk
+          name: ReadManga-signed-apk
           path: app/build/outputs/apk/release/*.apk
